@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/jaywcjlove/PermissionFlow",
       "state" : {
-        "revision" : "65434c9ae04dba97cf52c1dffbe3e4e62b547c82",
-        "version" : "2.11.4"
+        "revision" : "cb96db4bfd2342e8d8c56f2a7d51ca65b8aed6e2",
+        "version" : "2.11.3"
       }
     },
     {
