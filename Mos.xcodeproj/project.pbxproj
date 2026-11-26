@@ -815,7 +815,7 @@
 				minimumVersion = 2.0.0;
 			};
 		};
-		AADD0000000000000000000A /* PermissionFlow */ = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/jaywcjlove/PermissionFlow"; requirement = {kind = exactVersion; version = 2.11.4; }; };
+		AADD0000000000000000000A /* PermissionFlow */ = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/jaywcjlove/PermissionFlow"; requirement = {kind = exactVersion; version = 2.11.3; }; };
 		AADD0000000000000000000D /* Vortex */ = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/twostraws/Vortex"; requirement = {kind = exactVersion; version = 1.0.4; }; };
 /* End XCRemoteSwiftPackageReference section */
 
