@@ -2,8 +2,8 @@ import XCTest
 @testable import Mos_Debug
 
 /// Regression tests for `Options.readOptions()`: the scroll `step` / `speed` /
-/// `duration` defaults (33.6 / 2.70 / 4.35) must survive a missing UserDefaults
-/// key — mirroring the existing `deadZone` nil-guard.
+/// `duration` / `deadZone` defaults (20.0 / 2.10 / 3.80 / 0.50) must survive a
+/// missing UserDefaults key.
 ///
 /// `UserDefaults.double(forKey:)` returns `0.0` (not `nil`) for a missing key,
 /// which previously stomped those defaults. `speed == 0.0` is especially bad:
@@ -22,9 +22,9 @@ final class OptionsScrollDefaultsTests: XCTestCase {
     private var scrollSnapshot: ScrollSnapshot?
     private var savedNormalizeTiming = false
 
-    private let expectedStep = OPTIONS_SCROLL_DEFAULT().step         // 33.6
-    private let expectedSpeed = OPTIONS_SCROLL_DEFAULT().speed       // 2.70
-    private let expectedDuration = OPTIONS_SCROLL_DEFAULT().duration // 4.35
+    private let expectedStep = OPTIONS_SCROLL_DEFAULT().step         // 20.0
+    private let expectedSpeed = OPTIONS_SCROLL_DEFAULT().speed       // 2.10
+    private let expectedDuration = OPTIONS_SCROLL_DEFAULT().duration // 3.80
 
     // MARK: - Missing key falls back to the OPTIONS_SCROLL_DEFAULT() value
 
@@ -36,7 +36,7 @@ final class OptionsScrollDefaultsTests: XCTestCase {
         snapshotUserDefaultsAndRemove(OptionItem.Scroll.Speed)
         Options.shared.readOptions()
         XCTAssertEqual(Options.shared.scroll.speed, expectedSpeed, accuracy: 1e-9,
-                       "speed must fall back to 2.70 when its key is missing, not 0.0")
+                       "speed must fall back to 2.10 when its key is missing, not 0.0")
     }
 
     func testReadOptions_restoresStepAndDurationDefaults_whenKeysMissing() {
@@ -45,9 +45,9 @@ final class OptionsScrollDefaultsTests: XCTestCase {
         snapshotUserDefaultsAndRemove(OptionItem.Scroll.Duration)
         Options.shared.readOptions()
         XCTAssertEqual(Options.shared.scroll.step, expectedStep, accuracy: 1e-9,
-                       "step must fall back to 33.6 when its key is missing, not 0.0")
+                       "step must fall back to 20.0 when its key is missing, not 0.0")
         XCTAssertEqual(Options.shared.scroll.duration, expectedDuration, accuracy: 1e-9,
-                       "duration must fall back to 4.35 when its key is missing, not 0.0")
+                       "duration must fall back to 3.80 when its key is missing, not 0.0")
     }
 
     // MARK: - A genuinely stored value is honoured (regression guard)
@@ -77,8 +77,10 @@ final class OptionsScrollDefaultsTests: XCTestCase {
         let domain = "MosTests.NormalizeTiming.\(UUID())"
         let isolatedDefaults = try XCTUnwrap(UserDefaults(suiteName: domain))
         defer { isolatedDefaults.removePersistentDomain(forName: domain) }
-        XCTAssertFalse(OptionItem.Scroll.readNormalizeTiming(from: isolatedDefaults))
+        XCTAssertTrue(OptionItem.Scroll.readNormalizeTiming(from: isolatedDefaults))
 
+        isolatedDefaults.set(false, forKey: OptionItem.Scroll.TimeNormalization)
+        XCTAssertFalse(OptionItem.Scroll.readNormalizeTiming(from: isolatedDefaults))
         isolatedDefaults.set(true, forKey: OptionItem.Scroll.TimeNormalization)
         XCTAssertTrue(OptionItem.Scroll.readNormalizeTiming(from: isolatedDefaults))
         isolatedDefaults.set(false, forKey: OptionItem.Scroll.TimeNormalization)

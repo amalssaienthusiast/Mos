@@ -163,6 +163,7 @@ class PreferencesScrollingViewController: NSViewController, ScrollOptionsContext
             target.scroll = OPTIONS_SCROLL_DEFAULT()
         } else {
             Options.shared.scroll = OPTIONS_SCROLL_DEFAULT()
+            Options.shared.scrollNormalizeTiming = true
         }
         syncViewWithOptions()
     }

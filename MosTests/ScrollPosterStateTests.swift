@@ -363,6 +363,60 @@ final class ScrollPosterStateTests: XCTestCase {
         }
     }
 
+    func testApplyFrameValuesClearsStaleDiscreteLineAndFixedDeltas() throws {
+        let event = try XCTUnwrap(CGEvent(
+            scrollWheelEvent2Source: nil, units: .line, wheelCount: 2, wheel1: -3, wheel2: 2, wheel3: 0
+        ))
+        sut.applyFrameValuesForTests(to: event, y: 0.0, x: 5.0)
+        XCTAssertEqual(event.getIntegerValueField(.scrollWheelEventDeltaAxis1), 0)
+        XCTAssertEqual(event.getIntegerValueField(.scrollWheelEventDeltaAxis2), 0)
+        XCTAssertEqual(event.getDoubleValueField(.scrollWheelEventPointDeltaAxis1), 0.0, accuracy: 1e-10)
+        XCTAssertEqual(event.getDoubleValueField(.scrollWheelEventPointDeltaAxis2), 5.0, accuracy: 1e-10)
+        XCTAssertEqual(event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1), 0.0, accuracy: 1e-10)
+        XCTAssertEqual(event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2), 0.5, accuracy: 0.01)
+        XCTAssertEqual(event.getDoubleValueField(.scrollWheelEventIsContinuous), 1.0, accuracy: 1e-10)
+
+        sut.applyFrameValuesForTests(to: event, y: -15.0, x: 0.0)
+        XCTAssertEqual(event.getIntegerValueField(.scrollWheelEventDeltaAxis1), -1)
+        XCTAssertEqual(event.getIntegerValueField(.scrollWheelEventDeltaAxis2), 0)
+        XCTAssertEqual(event.getDoubleValueField(.scrollWheelEventPointDeltaAxis1), -15.0, accuracy: 1e-10)
+        XCTAssertEqual(event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1), -1.5, accuracy: 0.01)
+    }
+
+    @MainActor
+    func testDirectionReversalDoesNotEmitPreviousDirectionFrames() throws {
+        let clock = TestFrameClock(.fixedRate)
+        let sink = RecordingSink()
+        let poster = ScrollPoster(clockOverride: .fixedRate, makeFixedClock: { clock })
+        defer { poster.stop() }
+
+        let downEvent = try XCTUnwrap(CGEvent(
+            scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: 20, wheel2: 0, wheel3: 0
+        ))
+        poster.update(event: downEvent, duration: 0.2, y: 20, x: 0, speed: 1,
+                      route: .adapter(sink), targetPID: ProcessInfo.processInfo.processIdentifier).tryStart()
+        for index in 1...4 {
+            clock.onTick?(FrameTick(timestamp: Double(index) / 60.0, interval: 1.0 / 60.0))
+        }
+
+        sink.frames.removeAll()
+        let upEvent = try XCTUnwrap(CGEvent(
+            scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: -20, wheel2: 0, wheel3: 0
+        ))
+        poster.update(event: upEvent, duration: 0.2, y: -20, x: 0, speed: 1,
+                      route: .adapter(sink), targetPID: ProcessInfo.processInfo.processIdentifier).tryStart()
+        for index in 5...8 {
+            clock.onTick?(FrameTick(timestamp: Double(index) / 60.0, interval: 1.0 / 60.0))
+        }
+
+        let drain = expectation(description: "Drain adapter frames")
+        ScrollDispatchContext.shared.afterPendingAdapterOutput { drain.fulfill() }
+        wait(for: [drain], timeout: 1.0)
+
+        XCTAssertFalse(sink.frames.isEmpty)
+        XCTAssertTrue(sink.frames.allSatisfy { $0.y <= 0 }, "Reversal must not emit positive bounce-back frames: \(sink.frames)")
+    }
+
     private func input(to poster: ScrollPoster, at location: CGPoint) throws {
         let event = try XCTUnwrap(CGEvent(
             scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: 8, wheel2: 0, wheel3: 0
@@ -397,6 +451,14 @@ final class ScrollPosterStateTests: XCTestCase {
 
     private final class TestScrollSink: ScrollOutputSink {
         func frame(y: Double, x: Double, at location: CGPoint) {}
+        func end(at location: CGPoint) {}
+    }
+
+    private final class RecordingSink: ScrollOutputSink {
+        var frames: [(y: Double, x: Double)] = []
+        func frame(y: Double, x: Double, at location: CGPoint) {
+            frames.append((y: y, x: x))
+        }
         func end(at location: CGPoint) {}
     }
 }

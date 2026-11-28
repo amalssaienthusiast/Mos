@@ -26,6 +26,14 @@ struct ScrollPointAccumulator {
     private var targetPID: pid_t?
     private var remainder = (y: 0.0, x: 0.0)
 
+    mutating func resetY() {
+        remainder.y = 0
+    }
+
+    mutating func resetX() {
+        remainder.x = 0
+    }
+
     mutating func quantize(_ delta: (y: Double, x: Double), for pid: pid_t) -> (y: Double, x: Double) {
         if targetPID != pid {
             targetPID = pid

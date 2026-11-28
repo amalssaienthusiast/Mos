@@ -36,4 +36,14 @@ class ScrollFilter {
         next = (0, 0)
         previousFrameScale = 1
     }
+
+    func resetY() {
+        output.y = 0
+        next.y = 0
+    }
+
+    func resetX() {
+        output.x = 0
+        next.x = 0
+    }
 }

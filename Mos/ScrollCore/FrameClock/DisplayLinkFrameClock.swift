@@ -29,9 +29,11 @@ final class DisplayLinkFrameClock: ScrollFrameClock {
     // 对策: 每次建立 link 后延迟复查若干次, 发现 link 标称率明显低于显示器实际率就重建追平.
     private var rateVerifyTimer: Timer?
     private var rateVerifyAttemptsLeft = 0
+    private var rateVerifyScrollDeferrals = 0
     private var isVerifying = false
     private let rateVerifyDelays: [TimeInterval] = [2.0, 4.0, 8.0]
     private let rateVerifyRatio = 0.7
+    private let rateVerifyMaxScrollDeferrals = 5
 
     var isAvailable: Bool { link != nil }
     var isRunning: Bool { link.map { CVDisplayLinkIsRunning($0) } ?? false }
@@ -190,13 +192,14 @@ final class DisplayLinkFrameClock: ScrollFrameClock {
     // 建立 link 后调用: 重置复查序列并安排第一次复查
     private func scheduleRateVerify() {
         rateVerifyAttemptsLeft = rateVerifyDelays.count
+        rateVerifyScrollDeferrals = 0
         armNextRateVerify()
     }
 
-    private func armNextRateVerify() {
+    private func armNextRateVerify(after delayOverride: TimeInterval? = nil) {
         rateVerifyTimer?.invalidate()
         guard rateVerifyAttemptsLeft > 0 else { rateVerifyTimer = nil; return }
-        let delay = rateVerifyDelays[rateVerifyDelays.count - rateVerifyAttemptsLeft]
+        let delay = delayOverride ?? rateVerifyDelays[rateVerifyDelays.count - rateVerifyAttemptsLeft]
         rateVerifyTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
             self?.verifyRateAndFixIfNeeded()
         }
@@ -204,8 +207,13 @@ final class DisplayLinkFrameClock: ScrollFrameClock {
 
     // 复查: link 标称率明显低于显示器实际率 -> 重建追平 (幂等, 不受 recreateCooldown 限制)
     private func verifyRateAndFixIfNeeded() {
-        rateVerifyAttemptsLeft -= 1
         guard let current = link else { rateVerifyTimer = nil; return }
+        if CVDisplayLinkIsRunning(current) && rateVerifyScrollDeferrals < rateVerifyMaxScrollDeferrals {
+            rateVerifyScrollDeferrals += 1
+            armNextRateVerify(after: 1.0)
+            return
+        }
+        rateVerifyAttemptsLeft -= 1
         let nominal = Self.nominalHz(current)
         let expectedHz = preferredDisplay?.hz ?? Self.maxActiveDisplayHz()
         let wrongDisplay = preferredDisplay.map { CVDisplayLinkGetCurrentCGDisplay(current) != $0.id } ?? false

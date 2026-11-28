@@ -43,7 +43,10 @@ struct OptionItem {
 
         static func readNormalizeTiming(from defaults: UserDefaults) -> Bool {
             if let saved = defaults.object(forKey: NormalizeTiming) as? Bool { return saved }
-            return defaults.bool(forKey: TimeNormalization) || defaults.bool(forKey: ScreenFrameClock)
+            if defaults.object(forKey: TimeNormalization) != nil || defaults.object(forKey: ScreenFrameClock) != nil {
+                return defaults.bool(forKey: TimeNormalization) || defaults.bool(forKey: ScreenFrameClock)
+            }
+            return true
         }
     }
 
@@ -86,7 +89,7 @@ class Options {
     var scroll = OPTIONS_SCROLL_DEFAULT() {
         didSet { markChanged(.scroll) }
     }
-    var scrollNormalizeTiming = false {
+    var scrollNormalizeTiming = true {
         didSet { if scrollNormalizeTiming != oldValue { markChanged(.scroll) } }
     }
     // 按钮绑定

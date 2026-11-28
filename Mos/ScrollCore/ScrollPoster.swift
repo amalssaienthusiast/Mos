@@ -110,15 +110,25 @@ extension ScrollPoster {
         // 更新滚动配置
         self.duration = duration
         // 更新滚动数据
+        let remainingY = buffer.y - current.y
         if y*delta.y > 0 {
             buffer.y += y * speed * amplification
         } else {
+            if y != 0.0 && (y * delta.y < 0 || y * remainingY < 0) {
+                filter.resetY()
+                pointAccumulator.resetY()
+            }
             buffer.y = y * speed * amplification
             current.y = 0.0
         }
+        let remainingX = buffer.x - current.x
         if x*delta.x > 0 {
             buffer.x += x * speed * amplification
         } else {
+            if x != 0.0 && (x * delta.x < 0 || x * remainingX < 0) {
+                filter.resetX()
+                pointAccumulator.resetX()
+            }
             buffer.x = x * speed * amplification
             current.x = 0.0
         }
@@ -421,11 +431,16 @@ private extension ScrollPoster {
 
     func emitPhase(_ item: (Phase, Phase?), delta: (y: Double, x: Double)) {
         ScrollPhase.shared.apply(phase: item.0, autoAdvance: item.1)
+        let simTrackpadEnabled = resolveSimTrackpadEnabled()
+        guard simTrackpadEnabled || delta.y != 0.0 || delta.x != 0.0 else {
+            ScrollPhase.shared.didDeliverFrame()
+            return
+        }
         guard let snapshot = dispatchContext.preparePostingSnapshot() else {
             ScrollPhase.shared.didDeliverFrame()
             return
         }
-        let phaseOverride = resolveSimTrackpadEnabled() ? phaseValues(for: item.0) : nil
+        let phaseOverride = simTrackpadEnabled ? phaseValues(for: item.0) : nil
         _ = post(snapshot, delta, phaseOverride: phaseOverride, fallbackToCurrentPhase: false)
     }
 
@@ -493,9 +508,6 @@ private extension ScrollPoster {
         let frameDeadZone = deadZone * timing.scale
         let outputMagnitude = max(abs(shiftedValue.y), abs(shiftedValue.x))
         if outputMagnitude > frameDeadZone {
-            if ScrollMonitorTrace.isRecording {
-                ScrollMonitorTrace.shared.recordFrame(y: shiftedValue.y, x: shiftedValue.x)
-            }
             postFrame(shiftedValue)
         }
 
@@ -581,10 +593,7 @@ private extension ScrollPoster {
             snapshot.event.setDoubleValueField(.scrollWheelEventScrollPhase, value: currentPhaseValues.scroll)
             snapshot.event.setDoubleValueField(.scrollWheelEventMomentumPhase, value: currentPhaseValues.momentum)
         }
-        snapshot.event.setDoubleValueField(.scrollWheelEventPointDeltaAxis1, value: v.y)
-        snapshot.event.setDoubleValueField(.scrollWheelEventPointDeltaAxis2, value: v.x)
-        // 是否连续滚动: 始终为 1.0
-        snapshot.event.setDoubleValueField(.scrollWheelEventIsContinuous, value: 1.0)
+        Self.applyContinuousDeltas(to: snapshot.event, y: v.y, x: v.x)
         if let sender = config.trackpadSender {
             TrackpadEventField.setDeviceFields(
                 snapshot.event, sender: sender,
@@ -601,12 +610,38 @@ private extension ScrollPoster {
         return true
     }
 
+    private static func applyContinuousDeltas(to event: CGEvent, y: Double, x: Double) {
+        // 先写整数行位移: CoreGraphics 写 DeltaAxis 时会重算 Point/FixedPt, 因此必须在二者之前设置
+        event.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: Int64((y / 10.0).rounded(.towardZero)))
+        event.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: Int64((x / 10.0).rounded(.towardZero)))
+        event.setDoubleValueField(.scrollWheelEventPointDeltaAxis1, value: y)
+        event.setDoubleValueField(.scrollWheelEventPointDeltaAxis2, value: x)
+        event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: y / 10.0)
+        event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: x / 10.0)
+        // 是否连续滚动: 始终为 1.0
+        event.setDoubleValueField(.scrollWheelEventIsContinuous, value: 1.0)
+    }
+
     func postFrame(_ delta: (y: Double, x: Double)) {
         guard let snapshot = dispatchContext.preparePostingSnapshot() else { return }
+        let output: (y: Double, x: Double)
         if config.normalizesTiming, case .process = snapshot.route {
-            post(snapshot, pointAccumulator.quantize(delta, for: snapshot.targetPID))
+            output = pointAccumulator.quantize(delta, for: snapshot.targetPID)
+            guard output.y != 0.0 || output.x != 0.0 else { return }
         } else {
-            post(snapshot, delta)
+            output = delta
         }
+        if ScrollMonitorTrace.isRecording {
+            ScrollMonitorTrace.shared.recordFrame(y: delta.y, x: delta.x)
+        }
+        post(snapshot, output)
     }
 }
+
+#if DEBUG
+extension ScrollPoster {
+    func applyFrameValuesForTests(to event: CGEvent, y: Double, x: Double) {
+        Self.applyContinuousDeltas(to: event, y: y, x: x)
+    }
+}
+#endif

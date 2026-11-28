@@ -1151,7 +1151,9 @@ class LogiDeviceSession {
         guard !handshakeComplete else { return }
         handshakeComplete = true
         NotificationCenter.default.post(name: LogiSessionManager.sessionChangedNotification, object: nil)
-        probeOptionalFeatures()
+        if connectionMode != .bleDirect || LogiDebugPanel.isPanelOpen {
+            probeOptionalFeatures()
+        }
     }
 
     /// discoveryInFlight 切换 + 通知. idempotent: 只在状态变化时 post.
@@ -2552,6 +2554,11 @@ class LogiDeviceSession {
     /// 握手完成后探测一批可选 feature, 让 Debug 面板 FEATURES 表能列出它们.
     /// 必须串行 (一次一个): IRoot getFeature 响应不带 featureId, handleDiscoveryResponse
     /// 只能按 pendingDiscovery 唯一项匹配; 并发探测会把 index 张冠李戴.
+    func probeOptionalFeaturesIfNeeded() {
+        guard handshakeComplete, !optionalProbeSent else { return }
+        probeOptionalFeatures()
+    }
+
     private func probeOptionalFeatures() {
         guard !optionalProbeSent else { return }
         optionalProbeSent = true
@@ -3875,7 +3882,9 @@ class LogiDeviceSession {
         if receiverSweepActive {
             receiverSlotDiscoveryDidFinish(didDivert: true)
         } else {
-            probeOptionalFeatures()
+            if connectionMode != .bleDirect || LogiDebugPanel.isPanelOpen {
+                probeOptionalFeatures()
+            }
             // 非 sweep 发现(refresh / 手动 rediscover)完成: 排空热插拔期间入队的 slot.
             pumpPendingDivertQueue()
         }

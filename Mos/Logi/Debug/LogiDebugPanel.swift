@@ -269,6 +269,7 @@ class LogiDebugPanel: NSObject {
     #endif
 
     static let shared = LogiDebugPanel()
+    private(set) static var isPanelOpen = false
     static let logNotification = NSNotification.Name("LogiDebugLog")
 
     // MARK: - Layout Constants
@@ -595,6 +596,10 @@ class LogiDebugPanel: NSObject {
     // MARK: - Show / Hide
 
     func show() {
+        Self.isPanelOpen = true
+        for session in LogiSessionManager.shared.activeSessions where session.isHIDPPCandidate {
+            session.probeOptionalFeaturesIfNeeded()
+        }
         if let w = window {
             w.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
@@ -659,7 +664,10 @@ class LogiDebugPanel: NSObject {
 
         windowCloseObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification, object: panel, queue: .main
-        ) { [weak self] _ in self?.stopObserving() }
+        ) { [weak self] _ in
+            Self.isPanelOpen = false
+            self?.stopObserving()
+        }
 
         return panel
     }

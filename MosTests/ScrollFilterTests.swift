@@ -232,4 +232,22 @@ final class ScrollFilterTests: XCTestCase {
             XCTAssertEqual(distance.x, -90, "X at \(refreshRate) Hz")
         }
     }
+
+    func testAxisSpecificResetClearsOnlyReversedAxis() {
+        _ = sut.fill(with: (y: 12.0, x: 8.0))
+        _ = sut.fill(with: (y: 12.0, x: 8.0))
+        sut.resetY()
+        let next = sut.fill(with: (y: -10.0, x: 8.0))
+        XCTAssertEqual(next.y, 0.0, accuracy: 1e-10)
+        XCTAssertGreaterThan(next.x, 0.0)
+    }
+
+    func testPointAccumulatorAxisResetClearsOnlyTargetAxis() {
+        var accumulator = ScrollPointAccumulator()
+        _ = accumulator.quantize((0.6, 0.6), for: 1)
+        accumulator.resetY()
+        let result = accumulator.quantize((0.5, 0.5), for: 1)
+        XCTAssertEqual(result.y, 0.0)
+        XCTAssertEqual(result.x, 1.0)
+    }
 }

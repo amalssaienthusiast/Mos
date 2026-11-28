@@ -145,19 +145,19 @@ class OPTIONS_SCROLL_DEFAULT: Codable {
     var block: ScrollHotkey? = ScrollHotkey(type: .keyboard, code: KeyCode.commandL) {
         didSet {Options.shared.markChanged(scrollContainer: self)}
     }
-    var step = 33.6 {
+    var step = 20.0 {
         didSet {Options.shared.markChanged(scrollContainer: self)}
     }
-    var speed = 2.70 {
+    var speed = 2.10 {
         didSet {Options.shared.markChanged(scrollContainer: self)}
     }
-    var duration = 4.35 {
+    var duration = 3.80 {
         didSet {Options.shared.markChanged(scrollContainer: self)}
     }
     var durationTransition: Double {
         OPTIONS_SCROLL_DEFAULT.generateDurationTransition(with: duration)
     }
-    var deadZone = 1.00 {
+    var deadZone = 0.50 {
         didSet {Options.shared.markChanged(scrollContainer: self)}
     }
     var smoothSimTrackpad = false {
